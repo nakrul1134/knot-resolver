@@ -102,13 +102,13 @@ typedef array_t(uint8_t) pack_t;
 
 /** Return pack end pointer. */
 #define pack_tail(pack) \
-	&((pack).at[(pack).len])
+	((pack).len > 0 ? &((pack).at[(pack).len]) : NULL)
 
 /** Return packed object length. */
 static inline pack_objlen_t pack_obj_len(uint8_t *it)
 {
 	pack_objlen_t len = 0;
-	if (it)
+	if (it != NULL)
 		memcpy(&len, it, sizeof(len));
 	return len;
 }
@@ -116,12 +116,18 @@ static inline pack_objlen_t pack_obj_len(uint8_t *it)
 /** Return packed object value. */
 static inline uint8_t *pack_obj_val(uint8_t *it)
 {
+	if (it == NULL) {
+		return NULL;
+	}
 	return it + sizeof(pack_objlen_t);
 }
 
 /** Return pointer to next packed object. */
 static inline uint8_t *pack_obj_next(uint8_t *it)
 {
+	if (it == NULL) {
+		return NULL;
+	}
 	return pack_obj_val(it) + pack_obj_len(it);
 }
 
@@ -148,11 +154,11 @@ static inline uint8_t *pack_last(pack_t pack)
 static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
 	size_t packed_len = len + sizeof(len);
-	if (pack == NULL || (pack->len + packed_len) > pack->cap) {
+	if (pack == NULL || obj == NULL || (pack->len + packed_len) > pack->cap) {
 		return -1;
 	}
 
-	uint8_t *endp = pack_tail(*pack);
+	uint8_t *endp = pack->at + pack->len;
 	memcpy(endp, (char *)&len, sizeof(len));
 	memcpy(endp + sizeof(len), obj, len);
 	pack->len += packed_len;
@@ -164,6 +170,10 @@ static inline int pack_obj_push(pack_t *pack, const uint8_t *obj, pack_objlen_t 
   */
 static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
+		if (obj == NULL) {
+			return NULL;
+		}
+
 		uint8_t *endp = pack_tail(*pack);
 		uint8_t *it = pack_head(*pack);
 		while (it != endp) {
@@ -181,6 +191,10 @@ static inline uint8_t *pack_obj_find(pack_t *pack, const uint8_t *obj, pack_objl
   */
 static inline int pack_obj_del(pack_t *pack, const uint8_t *obj, pack_objlen_t len)
 {
+	if (obj == NULL) {
+		return -1;
+	}
+
 	uint8_t *endp = pack_tail(*pack);
 	uint8_t *it = pack_obj_find(pack, obj, len);
 	if (it) {
