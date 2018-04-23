@@ -10,9 +10,7 @@ arch=('x86_64')
 license=('GPL3')
 install=install
 depends=('cmocka'
-	 'hiredis'
          'knot>=2.6.4'
-	 'libmemcached'
 	 'libsystemd'
          'libuv'
 	 'lua51-sec'
