@@ -10,9 +10,12 @@ arch=('x86_64')
 license=('GPL3')
 install=install
 depends=('cmocka'
+	 'gnutls'
          'knot>=2.6.4'
+	 'libedit'
 	 'libsystemd'
          'libuv'
+	 'lmdb'
 	 'lua51-sec'
 	 'lua51-socket'
 	 'luajit')
