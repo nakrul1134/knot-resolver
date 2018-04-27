@@ -42,6 +42,7 @@ struct tls_client_paramlist_entry {
 	array_t(const char *) hostnames;
 	array_t(const char *) pins;
 	gnutls_certificate_credentials_t credentials;
+	gnutls_datum_t session_data;
 };
 
 struct worker_ctx;
@@ -89,7 +90,7 @@ struct tls_client_ctx_t {
 	 * this field must be always at first position
 	 */
 	struct tls_common_ctx c;
-	const struct tls_client_paramlist_entry *params;
+	struct tls_client_paramlist_entry *params;
 };
 
 /*! Create an empty TLS context in query context */
@@ -154,5 +155,5 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 			     tls_handshake_cb handshake_cb);
 
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
-			      const struct tls_client_paramlist_entry *entry,
+			      struct tls_client_paramlist_entry *entry,
 			      struct session *session);

@@ -576,6 +576,10 @@ static int client_paramlist_entry_clear(const char *k, void *v, void *baton)
 		gnutls_certificate_free_credentials(entry->credentials);
 	}
 
+	if (entry->session_data.data) {
+		gnutls_free(entry->session_data.data);
+	}
+
 	free(entry);
 
 	return 0;
@@ -896,6 +900,12 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 	ctx->handshake_state = TLS_HS_IN_PROGRESS;
 	ctx->session = session;
 
+	struct tls_client_paramlist_entry *tls_params = client_ctx->params;
+	if (tls_params->session_data.data != NULL) {
+		gnutls_session_set_data(ctx->tls_session, tls_params->session_data.data,
+					tls_params->session_data.size);
+	}
+
 	int ret = gnutls_handshake(ctx->tls_session);
 	if (ret == GNUTLS_E_SUCCESS) {
 		return kr_ok();
@@ -921,7 +931,7 @@ int tls_set_hs_state(struct tls_common_ctx *ctx, tls_hs_state_t state)
 }
 
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
-			      const struct tls_client_paramlist_entry *entry,
+			      struct tls_client_paramlist_entry *entry,
 			      struct session *session)
 {
 	if (!ctx) {
