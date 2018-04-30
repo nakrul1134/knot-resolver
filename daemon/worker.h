@@ -21,6 +21,7 @@
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
+#include "daemon/tls.h"
 
 
 /** Query resolution task (opaque). */
@@ -160,6 +161,7 @@ struct worker_ctx {
 	mp_freelist_t pool_sessions;
 	mp_freelist_t pool_iohandles;
 	knot_mm_t pkt_pool;
+	tls_session_cache_db_t *tls_session_cache;
 };
 
 /* @internal Union of some libuv handles for freelist.

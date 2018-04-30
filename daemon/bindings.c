@@ -624,6 +624,45 @@ static int net_tls_padding(lua_State *L)
 	return 1;
 }
 
+static int net_tls_session_db(lua_State *L)
+{
+	struct engine *engine = engine_luaget(L);
+
+	/* Only return current size and expiration interval. */
+	if (lua_gettop(L) == 0) {
+		lua_newtable(L);
+		lua_pushinteger(L, engine->net.tls_session_db_size);
+		lua_setfield(L, -2, "maximal size");
+		lua_pushinteger(L, engine->net.tls_session_db_expiration_interval);
+		lua_setfield(L, -2, "expiration interval");
+
+		return 1;
+	}
+
+	if ((lua_gettop(L) != 2)) {
+		lua_pushstring(L, "net.tls_session_db takes two parameters: (\"maximal number of records\", \"expiration interval in seconds\")");
+		lua_error(L);
+	}
+
+	size_t db_size  = lua_tointeger(L, 1);
+	int expiration_interval  = lua_tointeger(L, 2);
+	if (expiration_interval < 0) {
+		lua_pushstring(L, "net.tls_session_db(): expiration interval is negative.");
+		lua_error(L);
+	}
+
+	struct worker_ctx *worker = wrk_luaget(L);
+	if (engine->net.tls_session_db_size != db_size) {
+		engine->net.tls_session_db_size = db_size;
+		tls_session_cache_db_delete(worker->tls_session_cache);
+		worker->tls_session_cache = tls_session_cache_db_allocate(worker);
+	}
+	engine->net.tls_session_db_expiration_interval = expiration_interval;
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 static int net_outgoing(lua_State *L, int family)
 {
 	struct worker_ctx *worker = wrk_luaget(L);
@@ -684,18 +723,19 @@ static int net_outgoing_v6(lua_State *L) { return net_outgoing(L, AF_INET6); }
 int lib_net(lua_State *L)
 {
 	static const luaL_Reg lib[] = {
-		{ "list",         net_list },
-		{ "listen",       net_listen },
-		{ "close",        net_close },
-		{ "interfaces",   net_interfaces },
-		{ "bufsize",      net_bufsize },
-		{ "tcp_pipeline", net_pipeline },
-		{ "tls",          net_tls },
-		{ "tls_server",   net_tls },
-		{ "tls_client",   net_tls_client },
-		{ "tls_padding",  net_tls_padding },
-		{ "outgoing_v4",  net_outgoing_v4 },
-		{ "outgoing_v6",  net_outgoing_v6 },
+		{ "list",           net_list },
+		{ "listen",         net_listen },
+		{ "close",          net_close },
+		{ "interfaces",     net_interfaces },
+		{ "bufsize",        net_bufsize },
+		{ "tcp_pipeline",   net_pipeline },
+		{ "tls",            net_tls },
+		{ "tls_server",     net_tls },
+		{ "tls_client",     net_tls_client },
+		{ "tls_padding",    net_tls_padding },
+		{ "tls_session_db", net_tls_session_db },
+		{ "outgoing_v4",    net_outgoing_v4 },
+		{ "outgoing_v6",    net_outgoing_v6 },
 		{ NULL, NULL }
 	};
 	register_lib(L, "net", lib);

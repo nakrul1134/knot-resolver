@@ -22,6 +22,7 @@
 #include "lib/defines.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
+#include "lib/generic/lru.h"
 
 #define MAX_TLS_PADDING KR_EDNS_PAYLOAD
 #define TLS_MAX_UNCORK_RETRIES 100
@@ -47,6 +48,7 @@ struct tls_client_paramlist_entry {
 
 struct worker_ctx;
 struct qr_task;
+struct session;
 
 typedef enum tls_client_hs_state {
 	TLS_HS_NOT_STARTED = 0,
@@ -57,6 +59,10 @@ typedef enum tls_client_hs_state {
 } tls_hs_state_t;
 
 typedef int (*tls_handshake_cb) (struct session *session, int status);
+
+struct tls_session_cache_db_entry;
+
+typedef lru_t(struct tls_session_cache_db_entry) tls_session_cache_db_t;
 
 struct tls_common_ctx {
 	bool client_side;
@@ -81,6 +87,7 @@ struct tls_ctx_t {
 	 */
 	struct tls_common_ctx c;
 	struct tls_credentials *credentials;
+	tls_session_cache_db_t *session_cache;
 };
 
 struct tls_client_ctx_t {
@@ -157,3 +164,6 @@ int tls_client_connect_start(struct tls_client_ctx_t *client_ctx,
 int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
 			      struct tls_client_paramlist_entry *entry,
 			      struct session *session);
+
+tls_session_cache_db_t *tls_session_cache_db_allocate(struct worker_ctx *worker);
+void tls_session_cache_db_delete(tls_session_cache_db_t *tls_session_cache_db);
