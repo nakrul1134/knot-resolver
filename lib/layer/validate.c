@@ -420,8 +420,10 @@ static int update_delegation(struct kr_request *req, struct kr_query *qry, knot_
 			/* Rank the corresponding nonauth NS as insecure. */
 			for (int i = 0; i < req->auth_selected.len; ++i) {
 				ranked_rr_array_entry_t *ns = req->auth_selected.at[i];
-				if (ns->qry_uid != qry->uid || !ns->rr
-				    || ns->rr->type != KNOT_RRTYPE_NS) {
+				if (ns->qry_uid != qry->uid
+				    || !ns->rr
+				    || ns->rr->type != KNOT_RRTYPE_NS
+				    || !knot_dname_is_equal(proved_name, ns->rr->owner)) {
 					continue;
 				}
 				/* Found the record.  Note: this is slightly fragile
