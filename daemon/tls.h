@@ -66,7 +66,7 @@ struct tls_session_cache_db_entry;
 
 typedef lru_t(struct tls_session_cache_db_entry) tls_session_cache_db_t;
 
-typedef gnutls_datum tls_ticket_key_t;
+typedef gnutls_datum_t tls_ticket_key_t;
 
 struct tls_common_ctx {
 	bool client_side;
