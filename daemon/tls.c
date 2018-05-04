@@ -46,6 +46,12 @@
 #define DEBUG_MSG(fmt...)
 #endif
 
+#if GNUTLS_VERSION_NUMBER >= 0x030400
+#define tls_memset gnutls_memset
+#else
+#define tls_memset memset
+#endif
+
 static char const server_logstring[] = "tls";
 static char const client_logstring[] = "tls_client";
 
@@ -1045,8 +1051,8 @@ tls_ticket_key_t *tls_session_ticket_key_allocate(void)
 void tls_session_ticket_key_delete(tls_ticket_key_t *tls_session_ticket_key)
 {
 	if (tls_session_ticket_key != NULL) {
-		gnutls_memset(tls_session_ticket_key->data, 0,
-			      tls_session_ticket_key->size);
+		tls_memset(tls_session_ticket_key->data, 0,
+			   tls_session_ticket_key->size);
 		gnutls_free(tls_session_ticket_key->data);
 		free(tls_session_ticket_key);
 	}
