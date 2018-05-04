@@ -167,10 +167,15 @@ struct tls_ctx_t *tls_new(struct worker_ctx *worker)
 	gnutls_transport_set_ptr(tls->c.tls_session, tls);
 	gnutls_transport_set_push_function(tls->c.tls_session, worker_gnutls_push);
 
-	if (worker->tls_session_cache != NULL) {
+	if (net->tls_session_cache != NULL) {
 		gnutls_db_set_retrieve_function(tls->c.tls_session, session_db_fetch);
 		gnutls_db_set_store_function(tls->c.tls_session, session_db_store);
 		gnutls_db_set_ptr(tls->c.tls_session,tls);
+	}
+
+	if (net->tls_session_ticket_key != NULL) {
+		gnutls_session_ticket_enable_server(tls->c.tls_session,
+						    net->tls_session_ticket_key);
 	}
 
 	return tls;
@@ -957,11 +962,11 @@ int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
 	return kr_ok();
 }
 
-tls_session_cache_db_t *tls_session_cache_db_allocate(struct worker_ctx *worker)
+tls_session_cache_db_t *tls_session_cache_db_allocate(size_t tls_session_db_size)
 {
 	tls_session_cache_db_t *lru = NULL;
-	if (worker->engine->net.tls_session_db_size > 0) {
-		lru_create(&lru, worker->engine->net.tls_session_db_size, NULL, NULL);
+	if (tls_session_db_size > 0) {
+		lru_create(&lru, tls_session_db_size, NULL, NULL);
 	}
 	return lru;
 }
@@ -977,7 +982,8 @@ int session_db_store(void *db, gnutls_datum_t key, gnutls_datum_t data)
 {
 	struct tls_ctx_t *tls = (struct tls_ctx_t *)db;
 	struct worker_ctx *worker = tls->c.worker;
-	tls_session_cache_db_t *cache_db = worker->tls_session_cache;
+	struct network *net = &worker->engine->net;
+	tls_session_cache_db_t *cache_db = net->tls_session_cache;
 	tls_session_cache_db_entry_t *entry = lru_get_impl(&cache_db->lru, (const char *)key.data, key.size,
 							   sizeof(tls_session_cache_db_entry_t) + data.size,
 							   true, NULL);
@@ -994,7 +1000,8 @@ gnutls_datum_t session_db_fetch(void *db, gnutls_datum_t key)
 	gnutls_datum_t ret = { NULL, 0 };
 	struct tls_ctx_t *tls = (struct tls_ctx_t *)db;
 	struct worker_ctx *worker = tls->c.worker;
-	tls_session_cache_db_t *cache_db = worker->tls_session_cache;
+	struct network *net = &worker->engine->net;
+	tls_session_cache_db_t *cache_db = net->tls_session_cache;
 	tls_session_cache_db_entry_t *entry = lru_get_try(cache_db, (const char *)key.data, key.size);
 	if (entry != NULL) {
 		gnutls_datum_t check_time = { .data = entry->session_data,
@@ -1005,7 +1012,7 @@ gnutls_datum_t session_db_fetch(void *db, gnutls_datum_t key)
 		if (time_since_creation < 0) {
 			return ret;
 		}
-		if (time_since_creation > worker->engine->net.tls_session_db_expiration_interval) {
+		if (time_since_creation > net->tls_session_db_expiration_interval) {
 			return ret;
 		}
 
@@ -1019,6 +1026,54 @@ gnutls_datum_t session_db_fetch(void *db, gnutls_datum_t key)
 		memcpy(ret.data, entry->session_data, ret.size);
 	}
 	return ret;
+}
+
+tls_ticket_key_t *tls_session_ticket_key_allocate(void)
+{
+	gnutls_datum_t tls_session_ticket_key = { NULL, 0 };
+	gnutls_datum_t *res = NULL;
+	int err = gnutls_session_ticket_key_generate(&tls_session_ticket_key);
+	if (err == GNUTLS_E_SUCCESS) {
+		res = malloc(sizeof(gnutls_datum_t));
+		if (res != NULL) {
+			*res = tls_session_ticket_key;
+		}
+	}
+	return res;
+}
+
+void tls_session_ticket_key_delete(tls_ticket_key_t *tls_session_ticket_key)
+{
+	if (tls_session_ticket_key != NULL) {
+		gnutls_memset(tls_session_ticket_key->data, 0,
+			      tls_session_ticket_key->size);
+		gnutls_free(tls_session_ticket_key->data);
+		free(tls_session_ticket_key);
+	}
+}
+
+static void session_ticket_timer_callback(uv_timer_t *timer)
+{
+	tls_ticket_key_t **tls_session_ticket_key = (tls_ticket_key_t **)timer->data;
+	assert(tls_session_ticket_key);
+	if (*tls_session_ticket_key) {
+		tls_session_ticket_key_delete(*tls_session_ticket_key);
+	}
+	kr_log_verbose("[tls] TLS session ticket key regeneration\n");
+	*tls_session_ticket_key = tls_session_ticket_key_allocate();
+	uv_timer_again(timer);
+}
+
+int tls_session_ticket_timer_start(uv_timer_t* timer)
+{
+	assert(timer->data);
+	/* Regenerate session ticket key every hour */
+	return uv_timer_start(timer, session_ticket_timer_callback, 3600000, 3600000);
+}
+
+int tls_session_ticket_timer_stop(uv_timer_t* timer)
+{
+	return uv_timer_stop(timer);
 }
 
 #undef DEBUG_MSG

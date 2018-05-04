@@ -1095,7 +1095,10 @@ static int session_tls_hs_cb(struct session *session, int status)
 	struct tls_client_ctx_t *tls_client_ctx = session->tls_client_ctx;
 	struct tls_client_paramlist_entry *tls_params = tls_client_ctx->params;
 	gnutls_session_t tls_session = tls_client_ctx->c.tls_session;
-	if (gnutls_session_is_resumed(tls_session) == 0) {
+	if (gnutls_session_is_resumed(tls_session) != 0) {
+		kr_log_verbose("[tls_client] TLS session has resumed\n");
+	} else {
+		kr_log_verbose("[tls_client] TLS session has not resumed\n");
 		/* session wasn't resumed, delete old session data ... */
 		if (tls_params->session_data.data != NULL) {
 			gnutls_free(tls_params->session_data.data);
@@ -2440,7 +2443,6 @@ static int worker_reserve(struct worker_ctx *worker, size_t ring_maxlen)
 	worker->tcp_waiting = map_make(NULL);
 	worker->tcp_pipeline_max = MAX_PIPELINED;
 	memset(&worker->stats, 0, sizeof(worker->stats));
-	worker->tls_session_cache = tls_session_cache_db_allocate(worker);
 	return kr_ok();
 }
 
@@ -2467,9 +2469,6 @@ void worker_reclaim(struct worker_ctx *worker)
 	if (worker->z_import != NULL) {
 		zi_free(worker->z_import);
 		worker->z_import = NULL;
-	}
-	if (worker->tls_session_cache != NULL) {
-		tls_session_cache_db_delete(worker->tls_session_cache);
 	}
 }
 

@@ -48,6 +48,8 @@ struct tls_client_paramlist_entry {
 
 struct worker_ctx;
 struct qr_task;
+struct network;
+struct engine;
 struct session;
 
 typedef enum tls_client_hs_state {
@@ -63,6 +65,8 @@ typedef int (*tls_handshake_cb) (struct session *session, int status);
 struct tls_session_cache_db_entry;
 
 typedef lru_t(struct tls_session_cache_db_entry) tls_session_cache_db_t;
+
+typedef gnutls_datum tls_ticket_key_t;
 
 struct tls_common_ctx {
 	bool client_side;
@@ -165,5 +169,10 @@ int tls_client_ctx_set_params(struct tls_client_ctx_t *ctx,
 			      struct tls_client_paramlist_entry *entry,
 			      struct session *session);
 
-tls_session_cache_db_t *tls_session_cache_db_allocate(struct worker_ctx *worker);
+tls_session_cache_db_t *tls_session_cache_db_allocate(size_t tls_session_db_size);
 void tls_session_cache_db_delete(tls_session_cache_db_t *tls_session_cache_db);
+
+tls_ticket_key_t *tls_session_ticket_key_allocate(void);
+void tls_session_ticket_key_delete(tls_ticket_key_t *tls_session_ticket_key);
+int tls_session_ticket_timer_start(uv_timer_t* timer);
+int tls_session_ticket_timer_stop(uv_timer_t* timer);

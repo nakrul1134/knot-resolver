@@ -651,13 +651,24 @@ static int net_tls_session_db(lua_State *L)
 		lua_error(L);
 	}
 
-	struct worker_ctx *worker = wrk_luaget(L);
-	if (engine->net.tls_session_db_size != db_size) {
-		engine->net.tls_session_db_size = db_size;
-		tls_session_cache_db_delete(worker->tls_session_cache);
-		worker->tls_session_cache = tls_session_cache_db_allocate(worker);
+	struct network *net = &engine->net;
+	if (net->tls_session_db_size != db_size) {
+		net->tls_session_db_size = db_size;
+		tls_session_cache_db_delete(net->tls_session_cache);
+		net->tls_session_cache = tls_session_cache_db_allocate(net->tls_session_db_size);
 	}
 	engine->net.tls_session_db_expiration_interval = expiration_interval;
+
+	/* Force tls session ticket key regeneration  */
+	if (net->tls_session_ticket_key != NULL) {
+		tls_session_ticket_timer_stop(&net->tls_session_ticket_key_timer);
+		net->tls_session_ticket_key_timer.data = NULL;
+		tls_session_ticket_key_delete(net->tls_session_ticket_key);
+	}
+
+	net->tls_session_ticket_key = tls_session_ticket_key_allocate();
+	net->tls_session_ticket_key_timer.data = &net->tls_session_ticket_key;
+	tls_session_ticket_timer_start(&net->tls_session_ticket_key_timer);
 
 	lua_pushboolean(L, true);
 	return 1;
